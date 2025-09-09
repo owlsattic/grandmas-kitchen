@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Add Product • Grandma’s Kitchen (Admin)</title>
+  <meta name="robots" content="noindex,nofollow"/>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#fffdf8;color:#222;margin:0;padding:24px}
+    .wrap{max-width:760px;margin:0 auto}
+    h1{font-size:1.6rem;margin:0 0 1rem}
+    form{display:grid;gap:12px;background:#fff;padding:16px;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+    label{font-weight:600}
+    input,textarea,select{width:100%;box-sizing:border-box;padding:.6rem;border:1px solid #cfcfcf;border-radius:8px;font-size:1rem}
+    .row{display:grid;grid-template-columns:1fr auto;gap:12px}
+    .actions{display:flex;gap:12px;align-items:center;margin-top:.5rem;flex-wrap:wrap}
+    .hint{font-size:.85rem;color:#666}
+    button{background:#44633F;color:#fff;border:0;border-radius:8px;padding:.7rem 1rem;cursor:pointer}
+    button.secondary{background:#ddd;color:#222}
+    #fetchStatus{font-size:.9rem;color:#666}
+    #preview{background:#fff;border:1px solid #eee;border-radius:10px;padding:12px;margin-top:16px}
+    #preview .muted{color:#666}
+    #preview img{max-width:120px;border:1px solid #eee;border-radius:8px;background:#fff}
+    summary{cursor:pointer}
+    .chip{display:inline-block;padding:.15rem .5rem;border-radius:999px;background:#eef3ee;color:#2f5130;font-size:.8rem;margin-right:.25rem}
+    .linklike{background:#ddd;color:#222;border:0;border-radius:8px;padding:.7rem 1rem;cursor:pointer;text-decoration:none;display:inline-block}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>📦 Add a New Product</h1>
+
+    <form id="productForm" autocomplete="off">
+      <!-- Amazon link + Fetch -->
+      <label for="affiliate_link">Amazon Link or ASIN *</label>
+      <div class="row">
+        <input id="affiliate_link" name="affiliate_link" type="text" placeholder="https://amzn.to/... or https://www.amazon.co.uk/... or ASIN" required />
+        <button id="fetchAmazon" type="button" title="Fetch details from Amazon">Fetch</button>
+      </div>
+      <span id="fetchStatus" class="hint">Filled from Amazon. Review fields, then Submit.</span>
+
+      <!-- Minimal authoring fields -->
+      <label for="my_title">My Title *</label>
+      <input id="my_title" name="my_title" required />
+
+      <label for="image_main">Main Image URL *</label>
+      <input id="image_main" name="image_main" type="url" required placeholder="https://..." />
+
+      <label for="my_description_short">Short Description</label>
+      <textarea id="my_description_short" name="my_description_short" rows="2"></textarea>
+
+      <!-- REQUIRED: our curated category -->
+      <label for="shopCategory">Category *</label>
+      <select id="shopCategory" name="shop_category_id" required>
+        <option value="">— Choose a category —</option>
+      </select>
+      <small class="hint">Pick the best fit. You can add more categories later.</small>
+
+      <!-- Inline add-new -->
+      <div class="row" style="margin-top:.35rem">
+        <input id="newCategoryName" type="text" placeholder="New category name (e.g. Water Filters)" />
+        <button id="btnAddCategory" type="button" title="Add new category">Add</button>
+      </div>
+      <small class="hint">Can’t see it? Add one here—this will be saved and selected.</small>
+
+      <label style="display:flex;gap:.5rem;align-items:center;">
+        <input type="checkbox" id="approved" name="approved" value="true" />
+        Approved
+      </label>
+
+      <!-- hidden fields we still store -->
+      <input type="hidden" id="amazon_title" name="amazon_title" />
+      <input type="hidden" id="amazon_desc"  name="amazon_desc" />
+      <input type="hidden" id="image_small"   name="image_small" />
+      <input type="hidden" id="image_extra_1" name="image_extra_1" />
+      <input type="hidden" id="image_extra_2" name="image_extra_2" />
+      <input type="hidden" id="amazon_category" name="amazon_category" />
+      <input type="hidden" id="product_num"  name="product_num" />
+
+      <div class="actions">
+        <button id="submitBtn" type="submit">Submit</button>
+        <button id="saveAnotherBtn" type="submit" class="secondary">Save &amp; add another</button>
+        <a class="linklike" href="/shop.html">Back to Pantry</a>
+        <small class="hint">Shortcuts: ⌘+Enter = Save, Shift+Enter = Save &amp; add another</small>
+        <span id="status" class="hint" aria-live="polite"></span>
+      </div>
+    </form>
+
+    <!-- Integrated Test Fetch / Preview -->
+    <section id="preview" aria-live="polite">
+      <div class="muted"><small>Preview (from Fetch) shows what we pulled from Amazon.</small></div>
+      <div id="testFetchOut" style="margin-top:.5rem"></div>
+    </section>
+  </div>
+
+  <!-- add-product fetch v2.2 -->
+  <script>
+  window.addEventListener('DOMContentLoaded', () => {
+    const byId   = (id) => document.getElementById(id);
+    const byName = (n)  => document.querySelector(`[name="${n}"]`);
+
+    const btnFetch   = byId('fetchAmazon');
+    const statusEl   = byId('fetchStatus');
+    const previewEl  = byId('testFetchOut');
+
+    const FIELDS_TO_CLEAR = [
+      'amazon_title','amazon_desc','image_main','image_small',
+      'image_extra_1','image_extra_2','amazon_category',
+      'my_title','my_description_short','product_num'
+    ];
+
+    function clearAutoFields(){
+      FIELDS_TO_CLEAR.forEach((name) => { const el = byName(name); if (el) el.value = ''; });
+      if (previewEl) previewEl.innerHTML = '';
+    }
+    function esc(s){
+      return String(s||'')
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+        .replace(/'/g,'&#39;');
+    }
+    function extractASIN(s){
+      try{
+        const raw = (s||'').trim();
+        if (/^[A-Z0-9]{10}$/i.test(raw)) return raw.toUpperCase();
+        const u = new URL(raw, location.origin);
+        const m =
+          u.pathname.match(/\/dp\/([A-Z0-9]{10})/i) ||
+          u.pathname.match(/\/gp\/product\/([A-Z0-9]{10})/i) ||
+          u.search.match(/[?&]asin=([A-Z0-9]{10})/i);
+        return (m && m[1] && m[1].toUpperCase()) || '';
+      }catch{ return ''; }
+    }
+    function setIfEmpty(name,val){ if(val==null||val==='')return; const el=byName(name); if(el && !el.value) el.value = val; }
+
+    function renderPreview(s){
+      if (!previewEl) return;
+      const title = s.amazon_title || s.title || s.my_title || '';
+      const desc  = s.amazon_desc  || s.description || s.desc || '';
+      const img   = s.image_main || s.image || (Array.isArray(s.images)? s.images[0]:'') || s.image_small || '';
+      const asin  = extractASIN(byName('affiliate_link')?.value || '');
+      const cat   = s.amazon_category || '';
+      previewEl.innerHTML = `
+        <div style="display:flex;gap:12px;align-items:flex-start">
+          ${img ? `<img src="${esc(img)}" alt="Product image" style="max-width:120px;border:1px solid #eee;border-radius:8px;background:#fff" />` : ''}
+          <div>
+            <div style="font-weight:700;margin-bottom:.25rem">${esc(title) || '—'}</div>
+            <div style="font-size:.9rem;color:#444;margin-bottom:.5rem">${esc(desc).slice(0,220)}${desc && desc.length>220?'…':''}</div>
+            <div>
+              ${asin ? `<span class="chip">ASIN: ${esc(asin)}</span>` : ''}
+              ${cat  ? `<span class="chip">${esc(cat)}</span>` : ''}
+            </div>
+          </div>
+        </div>`;
+    }
+
+    async function trySelectCategoryByName(name){
+      const sel = byId('shopCategory');
+      if (!sel || !name) return false;
+      const lower = String(name).trim().toLowerCase();
+      for (const opt of sel.options){
+        if (opt.textContent.trim().toLowerCase() === lower){
+          sel.value = opt.value;
+          return true;
+        }
+      }
+      const i = byId('newCategoryName');
+      if (i && !i.value) i.value = name;
+      return false;
+    }
+
+    async function doFetch(){
+      const inputEl = byId('affiliate_link');
+      let input = (inputEl?.value || '').trim();
+      if (!input){
+        input = prompt('Paste an Amazon URL or ASIN:')?.trim() || '';
+        if (!input) return;
+        if (inputEl) inputEl.value = input;
+      }
+
+      clearAutoFields();
+      if (statusEl) statusEl.textContent = 'Fetching product details…';
+      if (btnFetch) btnFetch.disabled = true;
+
+      try{
+        const r = await fetch('/api/admin/amazon-fetch', {
+          method:'POST',
+          credentials:'include',
+          cache:'no-store',
+          headers:{ 'Content-Type':'application/json' },
+          body: JSON.stringify({ input })
+        });
+
+        const text = await r.text();
+        let payload;
+        try { payload = JSON.parse(text); }
+        catch { throw new Error('Non-JSON from /api/admin/amazon-fetch: ' + text.slice(0,160)); }
+
+        if (!r.ok) throw new Error(payload?.error?.message || payload?.error || ('Fetch failed ('+r.status+')'));
+
+        const s = payload.scraped || payload || {};
+
+        const title = s.amazon_title || s.title || s.my_title || '';
+        const desc  = s.amazon_desc  || s.description || s.desc || (Array.isArray(s.bullets)? s.bullets.join(' ') : '');
+        const img   = s.image_main || s.image || (Array.isArray(s.images)? s.images[0] : '') || s.image_small || '';
+        const imgSm = s.image_small || (Array.isArray(s.images)? s.images[1] : '') || img || '';
+
+        if (s.affiliate_link) byName('affiliate_link').value = s.affiliate_link;
+
+        setIfEmpty('amazon_title', title);
+        setIfEmpty('amazon_desc',  desc);
+        setIfEmpty('image_main',   img);
+        setIfEmpty('image_small',  imgSm);
+        setIfEmpty('image_extra_1', s.image_extra_1);
+        setIfEmpty('image_extra_2', s.image_extra_2);
+        setIfEmpty('amazon_category', s.amazon_category);
+
+        setIfEmpty('my_title', title);
+        const short = byId('my_description_short');
+        if (short && !short.value && desc) short.value = desc.slice(0,240);
+
+        const asin = extractASIN(byName('affiliate_link').value) || extractASIN(input);
+        if (asin) byName('product_num').value = asin.toLowerCase();
+
+        renderPreview({ ...s, amazon_title:title, amazon_desc:desc, image_main:img });
+
+        // Try to pre-select a matching category from Amazon
+        if (s.amazon_category) trySelectCategoryByName(s.amazon_category);
+
+        if (statusEl) statusEl.textContent = 'Filled from Amazon. Review fields, then Submit.';
+        console.debug('[add-product] fetch ok:', {asin, title, img});
+      }catch(err){
+        console.error('[add-product] fetch error:', err);
+        alert('Fetch failed:\n' + (err?.message || err));
+        if (statusEl) statusEl.textContent = 'Fetch failed.';
+      }finally{
+        if (btnFetch) btnFetch.disabled = false;
+      }
+    }
+
+    // Bind button
+    btnFetch?.addEventListener('click', doFetch);
+
+    // Auto-prefill via ?prefill / ?input / ?link / ?asin / ?url
+    try {
+      const p = new URLSearchParams(location.search);
+      const prefill = (p.get('prefill') || p.get('input') || p.get('link') || p.get('asin') || p.get('url') || '').trim();
+      if (prefill) {
+        const inputEl = byId('affiliate_link');
+        if (inputEl && !inputEl.value) inputEl.value = prefill;
+        doFetch();
+        history.replaceState(null, '', location.pathname);
+      } else {
+        const existing = byId('affiliate_link')?.value?.trim();
+        if (existing) { doFetch(); history.replaceState(null, '', location.pathname); }
+      }
+    } catch (e) { console.warn('[add-product] auto-prefill skipped:', e); }
+  });
+  </script>
+
+  <!-- categories + submit wiring -->
+  <script>
+  window.addEventListener('DOMContentLoaded', () => {
+    const sel        = document.getElementById('shopCategory');
+    const inputNew   = document.getElementById('newCategoryName');
+    const btnAdd     = document.getElementById('btnAddCategory');
+    const status     = document.getElementById('status');
+    const form       = document.getElementById('productForm');
+
+    function escapeHtml(s){return String(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[m]));}
+
+    async function loadCategories(){
+      try{
+        const r = await fetch('/api/admin/categories?include=count', { credentials:'include', cache:'no-store' });
+        const j = await r.json();
+        const items = Array.isArray(j.items)? j.items : [];
+        const keep = sel.value || '';
+        sel.innerHTML = '<option value="">— Choose a category —</option>' +
+          items.map(c => `<option value="${c.id}">${escapeHtml(c.name)}${typeof c.count==='number'?` (${c.count})`:''}</option>`).join('');
+        if (keep) sel.value = keep;
+      }catch(e){ console.warn('categories load failed', e); }
+    }
+
+    async function addNewCategory(){
+      const name = (inputNew.value||'').trim();
+      if (!name) { alert('Please enter a category name.'); return; }
+      btnAdd.disabled = true; status.textContent = 'Creating category…';
+      try {
+        const r = await fetch('/api/admin/categories', {
+          method:'POST',
+          credentials:'include',
+          headers:{ 'Content-Type':'application/json' },
+          body: JSON.stringify({ name })
+        });
+        const j = await r.json();
+        if (!r.ok || !j?.category?.id) throw new Error(j?.error || 'Create failed');
+        await loadCategories();
+        sel.value = j.category.id;
+        inputNew.value = '';
+        status.textContent = 'Created ✔';
+      } catch (e) {
+        alert('Could not add category: ' + (e.message || e));
+        status.textContent = '';
+      } finally { btnAdd.disabled = false; }
+    }
+
+    // Submit → /api/admin/product-upsert
+    form?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      status.textContent = '';
+      const submitBtn  = e.submitter || form.querySelector('button[type="submit"]');
+      const saveAnother = submitBtn && submitBtn.id === 'saveAnotherBtn';
+      submitBtn && (submitBtn.disabled = true);
+
+      if (!sel.value && inputNew.value.trim()) {
+        await addNewCategory();
+      }
+      if (!sel.value) { alert('Please choose or create a category.'); submitBtn && (submitBtn.disabled=false); return; }
+
+      const payload = {
+        my_title: document.getElementById('my_title').value.trim(),
+        image_main: document.getElementById('image_main').value.trim(),
+        affiliate_link: document.getElementById('affiliate_link').value.trim() || undefined,
+        product_num: document.getElementById('product_num').value.trim() || undefined,
+        my_description_short: document.getElementById('my_description_short').value.trim() || undefined,
+        shop_category_id: sel.value,
+        approved: document.getElementById('approved').checked,
+        amazon_title: document.getElementById('amazon_title').value || undefined,
+        amazon_desc: document.getElementById('amazon_desc').value || undefined,
+        image_small: document.getElementById('image_small').value || undefined,
+        image_extra_1: document.getElementById('image_extra_1').value || undefined,
+        image_extra_2: document.getElementById('image_extra_2').value || undefined,
+        amazon_category: document.getElementById('amazon_category').value || undefined,
+      };
+
+      if (!payload.my_title || !payload.image_main) { alert('Title and Image are required.'); submitBtn && (submitBtn.disabled=false); return; }
+
+      try {
+        const r = await fetch('/api/admin/product-upsert', {
+          method:'POST',
+          credentials:'include',
+          cache:'no-store',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify(payload)
+        });
+        const t = await r.text(); let j; try{ j=JSON.parse(t);}catch{ j={ raw:t }; }
+        if (!r.ok || j.error) throw new Error(j.error || ('HTTP '+r.status));
+
+        status.textContent = saveAnother ? 'Saved ✔ — add another…' : 'Saved ✔';
+
+        if (saveAnother) {
+          // clear for next entry
+          document.getElementById('my_title').value = '';
+          document.getElementById('affiliate_link').value = '';
+          document.getElementById('image_main').value = '';
+          document.getElementById('product_num').value = '';
+          document.getElementById('my_description_short').value = '';
+          document.getElementById('amazon_title').value = '';
+          document.getElementById('amazon_desc').value = '';
+          document.getElementById('image_small').value = '';
+          document.getElementById('image_extra_1').value = '';
+          document.getElementById('image_extra_2').value = '';
+          document.getElementById('amazon_category').value = '';
+          document.getElementById('testFetchOut').innerHTML = '';
+          document.getElementById('my_title').focus();
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+      } catch (err) {
+        alert('Save failed: ' + (err.message || err));
+      } finally {
+        submitBtn && (submitBtn.disabled=false);
+      }
+    });
+
+    // Image preview when edited manually
+    document.getElementById('image_main').addEventListener('input', ()=>{
+      const url = document.getElementById('image_main').value.trim();
+      try{ new URL(url); document.querySelector('#preview img')?.setAttribute('src', url); }
+      catch{ document.querySelector('#preview img')?.removeAttribute('src'); }
+    });
+
+    // Init
+    loadCategories();
+    btnAdd?.addEventListener('click', addNewCategory);
+
+    // Keyboard shortcuts
+    form?.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+      if (e.metaKey) { e.preventDefault(); document.getElementById('submitBtn')?.click(); }
+      else if (e.shiftKey) { e.preventDefault(); document.getElementById('saveAnotherBtn')?.click(); }
+    });
+  });
+  </script>
+</body>
+</html>

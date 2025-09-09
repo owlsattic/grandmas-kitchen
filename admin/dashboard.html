@@ -1,0 +1,108 @@
+/* ---- admin/dashboard.html ---- */
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Approve Products • Admin</title>
+  <meta name="robots" content="noindex,nofollow" />
+  <style>
+    :root{ --ink:#223; --muted:#667; --olive:#44633F; --bg:#fffdf8; }
+    body{ font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; background:var(--bg); color:var(--ink); margin:0; }
+    header,main{ max-width:1100px; margin:0 auto; padding:16px; }
+    h1{ margin:6px 0 14px; }
+    .toolbar{ display:grid; gap:10px; grid-template-columns: 1fr 180px 180px 160px 160px 110px; align-items:end; }
+    .toolbar label{ font-size:.85rem; color:var(--muted); }
+    .toolbar input,.toolbar select{ width:100%; padding:.55rem .6rem; border:1px solid #ccc; border-radius:8px; }
+    .toolbar .row{ display:flex; gap:8px; }
+    .btn{ background:var(--olive); color:#fff; border:0; border-radius:8px; padding:.6rem .9rem; cursor:pointer; }
+    .btn.secondary{ background:#ddd; color:#222; }
+    .btn.small{ padding:.45rem .7rem; font-size:.9rem; }
+    .muted{ color:var(--muted); }
+    table{ width:100%; border-collapse:separate; border-spacing:0 8px; }
+    th,td{ text-align:left; padding:10px 12px; background:#fff; }
+    th{ font-size:.9rem; color:#444; }
+    tr td:first-child, tr th:first-child{ border-radius:10px 0 0 10px; }
+    tr td:last-child, tr th:last-child{ border-radius:0 10px 10px 0; }
+    .thumb{ width:54px; height:54px; object-fit:contain; background:#fff; border:1px solid #eee; border-radius:8px; }
+    .nowrap{ white-space:nowrap; }
+    .grow{ width:100%; }
+    .chip{ display:inline-block; padding:.15rem .5rem; border-radius:999px; background:#eef3ee; color:#2f5130; font-size:.75rem; text-decoration:none; }
+    .row-actions{ display:flex; gap:8px; align-items:center; }
+    .topbar{ display:flex; justify-content:space-between; align-items:center; margin:6px 0 12px; }
+    .count{ font-size:.95rem; }
+    .center{ text-align:center; }
+  </style>
+</head>
+<body>
+<header class="topbar">
+  <h1>✅ Approve Products</h1>
+  <div class="count muted" id="resultCount"></div>
+</header>
+
+<main>
+  <form id="filters" class="toolbar">
+    <div>
+      <label for="q">Search (title / ASIN)</label>
+      <input id="q" name="q" placeholder="eg. battery, B09XYZ1234" />
+    </div>
+    <div>
+      <label for="status">Status</label>
+      <select id="status" name="status">
+        <option value="pending" selected>Pending</option>
+        <option value="approved">Approved</option>
+        <option value="all">All</option>
+      </select>
+    </div>
+    <div>
+      <label for="category">Category</label>
+      <select id="category" name="category">
+        <option value="">All categories</option>
+      </select>
+    </div>
+    <div>
+      <label for="addedBy">Added by (email)</label>
+      <input id="addedBy" name="addedBy" placeholder="user@example.com" />
+    </div>
+    <div>
+      <label for="dateFrom">Added after</label>
+      <input id="dateFrom" name="dateFrom" type="date" />
+    </div>
+    <div>
+      <label for="dateTo">Before</label>
+      <input id="dateTo" name="dateTo" type="date" />
+    </div>
+    <div class="row">
+      <button class="btn" type="submit">Search</button>
+      <button id="btnClear" class="btn secondary" type="button">Clear</button>
+    </div>
+    <div class="row" style="grid-column:1/-1; justify-content:flex-end; gap:10px;">
+      <button id="btnApproveSelected" class="btn small" type="button">Approve selected</button>
+      <a href="/admin/workshop" class="btn secondary small">Back to Workshop</a>
+    </div>
+  </form>
+
+  <div id="tableWrap" style="margin-top:14px;">
+    <table id="results">
+      <thead>
+        <tr>
+          <th class="center"><input type="checkbox" id="checkAll" /></th>
+          <th>Product</th>
+          <th>ASIN</th>
+          <th>Category</th>
+          <th>Added by</th>
+          <th class="nowrap">Created</th>
+          <th class="center">Approved</th>
+          <th class="center">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="rows">
+        <tr><td colspan="8" class="muted center">Loading…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</main>
+
+<script src="/admin/dashboard.js" defer></script>
+</body>
+</html>

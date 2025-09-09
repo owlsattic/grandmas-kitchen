@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Grandma’s Kitchen</title>
+
+  <link rel="alternate" type="application/rss+xml"
+        title="Grandma’s Kitchen • Daily Picks"
+        href="/app/home-picks.rss" />
+
+  <link rel="preload" href="/style.css" as="style" />
+  <link rel="stylesheet" href="/style.css" />
+  <style>
+    .skeleton{background:linear-gradient(90deg,#eee 25%,#f5f5f5 37%,#eee 63%);background-size:400% 100%;animation:shimmer 1.2s infinite}
+    @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+    .skeleton.img{width:200px;height:200px;border-radius:12px;margin:0 auto 10px}
+    .skeleton.text{height:16px;border-radius:8px;margin:6px 0}
+  </style>
+</head>
+<body>
+
+<header class="container center">
+  <a href="/index.html">
+    <img class="site-logo" src="/images/logo.jpg" alt="Grandma’s Kitchen Logo">
+  </a>
+  <nav aria-label="Primary">
+    <a href="/index.html" aria-current="page">Home</a>
+    <a href="/about.html">About</a>
+    <a href="/recipes.html">Recipes</a>
+    <a href="/shop.html">Shop</a>
+  </nav>
+  <p class="lead">Simple food. Lifelong health. Inspired by a 104-year legacy.</p>
+</header>
+
+<main>
+  <div class="container container--narrow">
+    <h1>Grandma’s Kitchen</h1>
+  </div>
+
+  <section class="container" aria-labelledby="daily-picks-title" style="margin-top:1rem">
+    <h2 id="daily-picks-title">Today’s Picks</h2>
+    <div id="homePicks" class="grid grid-2">
+      <article class="card"><div class="skeleton img"></div><div class="skeleton text" style="width:70%"></div></article>
+      <article class="card"><div class="skeleton img"></div><div class="skeleton text" style="width:60%"></div></article>
+    </div>
+  </section>
+</main>
+
+<footer class="container container--narrow">
+  <p>© 2025 Grandma’s Kitchen • All rights reserved</p>
+  <p style="text-align:center; margin-top:.5rem">
+  <a class="btn btn-admin"
+     href="/admin/workshop"
+     rel="nofollow noopener"
+     aria-label="Admin workshop (password required)">
+    Office use only — Admin
+  </a>
+</p>
+  <p class="affiliate-note">As an Amazon Associate, we (Grandma's Kitchen) earn from qualifying purchases.</p>
+</footer>
+
+<script>
+(async function () {
+  const box = document.getElementById('homePicks');
+  if (!box) return;
+
+  const esc = s => (s||'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+
+  try {
+    const r = await fetch('/app/home-picks.json', { cache: 'no-store' });
+    const data = await r.json();
+    const items = Array.isArray(data?.items) ? data.items : [];
+    if (!r.ok || !items.length) {
+      box.innerHTML = `<p class="muted">Sorry, today’s picks are unavailable.</p>`;
+      return;
+    }
+
+    box.innerHTML = items.map(p => `
+      <article class="card" aria-labelledby="pick-${esc(p.product_num)}">
+        <a class="product-image" href="${esc(p.url)}">
+          ${p.image ? `<img loading="lazy" decoding="async" src="${esc(p.image)}" alt="${esc(p.titleShort || p.title || 'Product')}">` : ''}
+        </a>
+        <h3 id="pick-${esc(p.product_num)}" class="product-title">
+          <a href="${esc(p.url)}">${esc(p.titleShort || p.title || 'Product')}</a>
+        </h3>
+        ${p.category ? `<p class="muted" style="margin:.25rem 0 .5rem">
+            <a href="/shop.html?cat=${encodeURIComponent(p.category)}">${esc(p.category)}</a>
+          </p>` : ''}
+        <p><a class="btn" href="${esc(p.url)}">View product</a></p>
+      </article>
+    `).join('');
+  } catch (err) {
+    console.error('home-picks error:', err);
+    box.innerHTML = `<p class="muted">Sorry, today’s picks are unavailable.</p>`;
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+project_id = "xipgwsckilciddoqrfsj"
+
+[functions.generate-fab]
+verify_jwt = false
+
+[functions.generate-product-content]
+verify_jwt = false
+
+[functions.reformat-description]
+verify_jwt = false
+
+[functions.suggest-categories]
+verify_jwt = false
+
+[functions.kid-friendly-recipe]
+verify_jwt = false
+
+[functions.parse-recipe]
+verify_jwt = false
+
+[functions.search-pexels-images]
+verify_jwt = false

@@ -1,0 +1,13 @@
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: #fff6eb;
+  color: #1b1b1b;
+  margin: 0;
+}
+a {
+  text-decoration: none;
+  color: #4b6043;
+}
+a:hover {
+  text-decoration: underline;
+}

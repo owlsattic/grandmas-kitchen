@@ -1,3 +1,12 @@
+# ⚠️ Archived / Moved
+
+This repository is an archived source repository originally created via Lovable.
+
+✅ **Canonical, owner-controlled repository:**  
+https://github.com/EZEEIT-LTD/grandmas-kitchen
+
+⚠️ Do not commit new changes here.
+
 # Welcome to your Lovable project
 
 ## Project info
